@@ -49,14 +49,20 @@ export const ribbonVertexShader = /* glsl */ `
   ${sharedVaryings}
 
   void main() {
-    float s = fract(aPhase + uTime * 0.025);
+    float s = fract(aPhase + uTime * 0.00175);
     float y = -uHeight * 0.5 + s * uHeight;
     float r = uRadius * (1.0 - s) + 0.35;
     float angle = s * uTurns * 6.2831853 + aOffset;
     vec3 spiral = vec3(cos(angle) * r, y, sin(angle) * r) + aJitter;
     vec3 p = mix(spiral, aScatter, uExplode);
-    ${pointSize}
-    vAlpha = smoothstep(0.0, 0.08, s) * smoothstep(1.0, 0.9, s) * (0.6 + 0.4 * twinkle);
+    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    float spark = fract(sin(aPhase * 127.1 + dot(aJitter.xz, vec2(311.7, 74.7))) * 43758.5453);
+    float wave = sin(uTime * (0.7 + spark * 2.4) + spark * 6.2831853);
+    float twinkle = pow(clamp(0.5 + 0.5 * wave, 0.0, 1.0), 5.0);
+    gl_PointSize = min(uSize * aSize * uPixelRatio * (0.3 + twinkle) / -mvPosition.z, 8.0 * uPixelRatio);
+    vColor = aColor;
+    vAlpha = (0.12 + 0.88 * twinkle) * smoothstep(0.0, 0.06, s) * smoothstep(1.0, 0.94, s);
   }
 `
 

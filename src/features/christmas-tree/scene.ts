@@ -21,14 +21,15 @@ export interface ChristmasTreeController {
 
 const TREE_HEIGHT = 8
 const TREE_RADIUS = 3.2
-const RIBBON_TURNS = 4.5
+const RIBBON_TURNS = 1.35
 const SNOW_FLOOR = -6
 const SNOW_SPAN = 22
 const BASE_DISTANCE = 17
 const FIT_HALF_WIDTH = 4.6
 
-const GREENS = ['#0f9d58', '#16c172', '#2ee59d', '#0b7a4b', '#7cf5b8']
-const ORNAMENTS = ['#ff3b5c', '#ffd166', '#ff8fab', '#5ec8ff', '#fff4d6']
+const SILVERS = ['#c5ccd6', '#d5dbe3', '#e7edf4', '#f4f7fb', '#ffffff']
+const STAR_OUTER = 0.72
+const STAR_INNER = 0.3
 
 function randomScatter(target: Float32Array, i: number) {
   const r = 7 + Math.random() * 9
@@ -70,39 +71,57 @@ function buildTreeGeometry(count: number) {
   const colors = new Float32Array(count * 3)
   const sizes = new Float32Array(count)
   const phases = new Float32Array(count)
-  const arms = 9
+  const layers = 8
+  const branchesPerLayer = 8
 
   for (let i = 0; i < count; i++) {
-    const h = 1 - Math.sqrt(Math.random()) * 0.98
-    const y = -TREE_HEIGHT / 2 + h * TREE_HEIGHT
-    const layerRadius = TREE_RADIUS * (1 - h)
-    const onArm = Math.random() < 0.7
-    const arm = Math.floor(Math.random() * arms)
-    const angle = onArm
-      ? (arm / arms) * Math.PI * 2 + h * Math.PI * 6 + (Math.random() - 0.5) * 0.35
-      : Math.random() * Math.PI * 2
-    const radius = onArm
-      ? layerRadius * (0.55 + 0.45 * Math.random())
-      : layerRadius * Math.sqrt(Math.random())
-    const droop = (radius / TREE_RADIUS) * 0.35
+    const roll = Math.random()
+    let x = 0
+    let y = 0
+    let z = 0
 
-    positions[i * 3] = Math.cos(angle) * radius
-    positions[i * 3 + 1] = y - droop + (Math.random() - 0.5) * 0.15
-    positions[i * 3 + 2] = Math.sin(angle) * radius
+    if (roll < 0.04) {
+      const h = Math.random()
+      y = -TREE_HEIGHT / 2 + h * TREE_HEIGHT * 0.96
+      const trunk = 0.05 + Math.random() * 0.04
+      const angle = Math.random() * Math.PI * 2
+      x = Math.cos(angle) * trunk
+      z = Math.sin(angle) * trunk
+    } else if (roll < 0.46) {
+      const h = Math.pow(Math.random(), 0.9)
+      const profile = TREE_RADIUS * Math.pow(1 - h, 0.7)
+      const radius = profile * Math.sqrt(Math.random()) * 0.82
+      const angle = Math.random() * Math.PI * 2
+      x = Math.cos(angle) * radius
+      z = Math.sin(angle) * radius
+      y = -TREE_HEIGHT / 2 + h * TREE_HEIGHT * 0.94 - radius * 0.12
+    } else {
+      const layer = Math.min(layers - 1, Math.floor(Math.pow(Math.random(), 0.85) * layers))
+      const layerT = layer / (layers - 1)
+      const yBase = -TREE_HEIGHT / 2 + Math.pow(layerT, 0.92) * TREE_HEIGHT * 0.94
+      const reach = TREE_RADIUS * Math.pow(1 - layerT, 0.7)
+      const branch = Math.floor(Math.random() * branchesPerLayer)
+      const branchAngle = (branch / branchesPerLayer) * Math.PI * 2 + layer * 0.5
+      const along = Math.pow(Math.random(), 0.8)
+      const radius = reach * (0.15 + 0.85 * along)
+      const thickness = reach * (0.05 + 0.2 * along) * Math.sqrt(Math.random())
+      const side = Math.random() * Math.PI * 2
+      const angle = branchAngle + (Math.cos(side) * thickness) / Math.max(radius, 0.2)
+      const droop = along * along * (0.42 + 0.22 * (1 - layerT))
+      x = Math.cos(angle) * radius
+      z = Math.sin(angle) * radius
+      y = yBase - droop + Math.sin(side) * thickness * 0.65
+    }
+
+    positions[i * 3] = x
+    positions[i * 3 + 1] = y
+    positions[i * 3 + 2] = z
     randomScatter(scatter, i)
     phases[i] = Math.random()
 
-    const roll = Math.random()
-    if (roll < 0.08) {
-      setColor(colors, i, pick(ORNAMENTS), 1.1)
-      sizes[i] = 2.4 + Math.random() * 2
-    } else if (roll < 0.12) {
-      setColor(colors, i, '#ffffff', 0.8)
-      sizes[i] = 1.2 + Math.random()
-    } else {
-      setColor(colors, i, pick(GREENS), 0.7)
-      sizes[i] = 0.7 + Math.random() * 0.9
-    }
+    const ornament = Math.random() < 0.07
+    setColor(colors, i, pick(SILVERS), ornament ? 0.75 : 0.62)
+    sizes[i] = ornament ? 2.2 + Math.random() * 1.4 : 0.65 + Math.random() * 0.85
   }
 
   const geometry = new THREE.BufferGeometry()
@@ -116,8 +135,9 @@ function buildTreeGeometry(count: number) {
 
 function buildRibbonGeometry(countPerRibbon: number) {
   const ribbons = [
-    { offset: 0, color: '#ffd166' },
-    { offset: Math.PI, color: '#ff6b8b' },
+    { offset: 0, color: '#f7f8fb' },
+    { offset: (Math.PI * 2) / 3, color: '#e7edf4' },
+    { offset: (Math.PI * 4) / 3, color: '#d5dbe3' },
   ]
   const count = countPerRibbon * ribbons.length
   const positions = new Float32Array(count * 3)
@@ -137,7 +157,7 @@ function buildRibbonGeometry(countPerRibbon: number) {
       jitter[i * 3 + 1] = (Math.random() - 0.5) * 0.12
       jitter[i * 3 + 2] = (Math.random() - 0.5) * 0.12
       randomScatter(scatter, i)
-      setColor(colors, i, ribbon.color, 0.9)
+      setColor(colors, i, ribbon.color, 0.7)
       sizes[i] = 1.1 + Math.random() * 0.8
     }
   })
@@ -154,41 +174,33 @@ function buildRibbonGeometry(countPerRibbon: number) {
   return geometry
 }
 
-function buildStarGeometry(count: number) {
-  const outer = 0.65
-  const inner = 0.27
+function starCorners() {
   const corners: Array<THREE.Vector2> = []
   for (let k = 0; k < 10; k++) {
-    const a = (k / 10) * Math.PI * 2 + Math.PI / 2
-    const r = k % 2 === 0 ? outer : inner
-    corners.push(new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r))
+    const angle = (k / 10) * Math.PI * 2 + Math.PI / 2
+    const radius = k % 2 === 0 ? STAR_OUTER : STAR_INNER
+    corners.push(new THREE.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius))
   }
+  return corners
+}
 
-  const positions = new Float32Array(count * 3)
+function pointsFromPositions(
+  positions: Float32Array,
+  color: string,
+  boost: number,
+  size: number,
+) {
+  const count = positions.length / 3
   const scatter = new Float32Array(count * 3)
   const colors = new Float32Array(count * 3)
   const sizes = new Float32Array(count)
   const phases = new Float32Array(count)
-
   for (let i = 0; i < count; i++) {
-    const k = Math.floor(Math.random() * 10)
-    const a = corners[k]
-    const b = corners[(k + 1) % 10]
-    let u = Math.random()
-    let v = Math.random()
-    if (u + v > 1) {
-      u = 1 - u
-      v = 1 - v
-    }
-    positions[i * 3] = a.x * u + b.x * v
-    positions[i * 3 + 1] = a.y * u + b.y * v
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 0.12
     randomScatter(scatter, i)
-    setColor(colors, i, Math.random() < 0.8 ? '#ffd166' : '#fff6d5', 1.1)
-    sizes[i] = 1.2 + Math.random() * 1.2
+    setColor(colors, i, color, boost)
+    sizes[i] = size * (0.85 + Math.random() * 0.3)
     phases[i] = Math.random()
   }
-
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geometry.setAttribute('aScatter', new THREE.BufferAttribute(scatter, 3))
@@ -196,6 +208,63 @@ function buildStarGeometry(count: number) {
   geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1))
   geometry.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1))
   return geometry
+}
+
+function buildStarOutlineGeometry(count: number) {
+  const corners = starCorners()
+  const positions = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    const edge = i % corners.length
+    const t = (Math.floor(i / corners.length) + Math.random()) / Math.ceil(count / corners.length)
+    const a = corners[edge]
+    const b = corners[(edge + 1) % corners.length]
+    const tangent = b.clone().sub(a)
+    const normal = new THREE.Vector2(-tangent.y, tangent.x).normalize()
+    const offset = (Math.random() - 0.5) * 0.035
+    positions[i * 3] = a.x + (b.x - a.x) * t + normal.x * offset
+    positions[i * 3 + 1] = a.y + (b.y - a.y) * t + normal.y * offset
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 0.02
+  }
+  return pointsFromPositions(positions, '#d5dbe3', 0.42, 1.1)
+}
+
+function sampleText(text: string) {
+  const width = 640
+  const height = 280
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return []
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '700 210px "Times New Roman", Georgia, serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, width / 2, height / 2)
+  const pixels = ctx.getImageData(0, 0, width, height).data
+  const hits: Array<THREE.Vector2> = []
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      if (pixels[(y * width + x) * 4 + 3] > 140) {
+        hits.push(new THREE.Vector2(x / width - 0.5, 0.5 - y / height))
+      }
+    }
+  }
+  return hits
+}
+
+function buildLetterGeometry(count: number) {
+  const hits = sampleText('UU')
+  const positions = new Float32Array(count * 3)
+  const width = 0.6
+  const height = 0.38
+  for (let i = 0; i < count; i++) {
+    const hit = hits.length > 0 ? hits[Math.floor(Math.random() * hits.length)] : new THREE.Vector2()
+    positions[i * 3] = hit.x * width + (Math.random() - 0.5) * 0.008
+    positions[i * 3 + 1] = hit.y * height + (Math.random() - 0.5) * 0.008
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 0.015
+  }
+  return pointsFromPositions(positions, '#ffffff', 0.48, 0.7)
 }
 
 function buildGroundGeometry(count: number) {
@@ -215,7 +284,7 @@ function buildGroundGeometry(count: number) {
     positions[i * 3 + 1] = -TREE_HEIGHT / 2 - 0.45 + (Math.random() - 0.5) * 0.05
     positions[i * 3 + 2] = Math.sin(angle) * radius
     randomScatter(scatter, i)
-    setColor(colors, i, inRing ? '#ffd166' : pick(['#5ec8ff', '#a78bfa', '#ffffff']), inRing ? 1 : 0.6)
+    setColor(colors, i, inRing ? '#d5dbe3' : '#e8eef5', inRing ? 0.7 : 0.5)
     sizes[i] = inRing ? 0.9 + Math.random() * 0.6 : 0.5 + Math.random() * 0.8
     phases[i] = Math.random()
   }
@@ -260,7 +329,6 @@ export function createChristmasTree(
     window.matchMedia('(max-width: 768px)').matches ||
     window.matchMedia('(pointer: coarse)').matches
   const scale = isCompact ? 0.65 : 1
-  const haloSize = isCompact ? 2 : 3
   const pixelRatio = Math.min(window.devicePixelRatio, 2)
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
@@ -323,25 +391,21 @@ export function createChristmasTree(
   const ribbons = new THREE.Points(buildRibbonGeometry(Math.floor(1400 * scale)), ribbonMaterial)
   treeGroup.add(ribbons)
 
+  const starGroup = new THREE.Group()
+  starGroup.position.y = TREE_HEIGHT / 2 + 0.72
+  treeGroup.add(starGroup)
+
   const starMaterial = createPointsMaterial(treeVertexShader, {
     ...shared,
-    uSize: { value: 40 },
+    uSize: { value: 28 },
   })
-  const star = new THREE.Points(buildStarGeometry(Math.floor(1200 * scale)), starMaterial)
-  star.position.y = TREE_HEIGHT / 2 + 0.55
-  treeGroup.add(star)
-
-  const haloMaterial = new THREE.SpriteMaterial({
-    map: createGlowTexture(),
-    color: '#ffcf66',
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
+  const letterMaterial = createPointsMaterial(treeVertexShader, {
+    ...shared,
+    uSize: { value: 14 },
   })
-  const halo = new THREE.Sprite(haloMaterial)
-  halo.scale.setScalar(haloSize)
-  halo.position.y = star.position.y
-  treeGroup.add(halo)
+  const star = new THREE.Points(buildStarOutlineGeometry(Math.floor(900 * scale)), starMaterial)
+  const letters = new THREE.Points(buildLetterGeometry(Math.floor(1800 * scale)), letterMaterial)
+  starGroup.add(star, letters)
 
   const groundMaterial = createPointsMaterial(treeVertexShader, {
     ...shared,
@@ -465,9 +529,6 @@ export function createChristmasTree(
     snowOpacity.value += (snowTarget - snowOpacity.value) * Math.min(1, delta * 3)
     snow.visible = snowOpacity.value > 0.01
 
-    star.rotation.y = elapsed * 0.8
-    const pulse = 1 + Math.sin(elapsed * 2.4) * 0.15
-    halo.scale.setScalar(haloSize * pulse * (1 - shared.uExplode.value * 0.7))
     ground.rotation.y = -elapsed * 0.05
 
     controls.update()
@@ -497,31 +558,18 @@ export function createChristmasTree(
       controls.removeEventListener('start', onControlStart)
       controls.removeEventListener('end', onControlEnd)
       controls.dispose()
-      for (const points of [tree, ribbons, star, ground, snow]) {
+      for (const points of [tree, ribbons, star, letters, ground, snow]) {
         points.geometry.dispose()
+      }
+      starMaterial.dispose()
+      letterMaterial.dispose()
+      for (const points of [tree, ribbons, ground, snow]) {
         ;(points.material as THREE.Material).dispose()
       }
-      haloMaterial.map?.dispose()
-      haloMaterial.dispose()
       bloom.dispose()
       composer.dispose()
       renderer.dispose()
       renderer.domElement.remove()
     },
   }
-}
-
-function createGlowTexture() {
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  gradient.addColorStop(0, 'rgba(255,255,255,1)')
-  gradient.addColorStop(0.2, 'rgba(255,220,140,0.6)')
-  gradient.addColorStop(1, 'rgba(255,200,100,0)')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, size, size)
-  return new THREE.CanvasTexture(canvas)
 }
